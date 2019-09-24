@@ -1,0 +1,517 @@
+{
+   "AWSTemplateFormatVersion":"2010-09-09",
+   "Description":"Creates resources necessary for the Replicate, Analyze and Visualize datasets using AWS Database Migration Service and Serverless Big Data technologies workshop.",
+   "Parameters":{
+      "KeyName":{
+         "Description":"",
+         "Type":"AWS::EC2::KeyPair::KeyName"
+      },
+	  "IPAddress":{
+         "Description":"Your IP address from where you will RDP into the EC2 instance. You can get it from WhatisMyIP or a tool of your choice",
+         "Type": "String",
+         "MinLength": "9",
+         "MaxLength": "18",
+         "Default": "0.0.0.0/0",
+         "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+         "ConstraintDescription": "Must be a valid IP CIDR range of the form x.x.x.x/x."
+      }
+   },
+   "Mappings" : {
+     "RegionMap" : {
+       "us-east-1"      : { "32" : "ami-c100bebb"},
+       "us-east-2"      : { "32" : "ami-548ea131"},
+       "us-west-2"      : { "32" : "ami-9e4493e6"},
+       "eu-west-1"      : { "32" : "ami-8575dafc"},
+       "ap-southeast-2" : { "32" : "ami-0bb85069"}
+     },
+     "QuickSightIPRange" : {
+       "us-east-1"      : { "range" : "52.23.63.224/27"},
+       "us-east-2"      : { "range" : "52.15.247.160/27"},
+       "us-west-2"      : { "range" : "54.70.204.128/27"},
+       "eu-west-1"      : { "range" : "52.210.255.224/27"},
+       "ap-southeast-2" : { "range" : "54.153.249.96/27"}
+     }
+   },
+   "Resources":{
+      "DmsVpc":{
+         "Type":"AWS::EC2::VPC",
+         "Properties":{
+            "CidrBlock":"172.31.0.0/16",
+            "EnableDnsSupport":"true",
+            "EnableDnsHostnames":"true",
+            "InstanceTenancy":"default",
+            "Tags":[
+               {
+                  "Key":"Name",
+                  "Value":{
+                     "Fn::Join":[
+                        "-",
+                        [
+                           {
+                              "Ref":"AWS::StackName"
+                           },
+                           "DmsVpc"
+                        ]
+                     ]
+                  }
+               }
+            ]
+         }
+      },
+      "DMSInternetGateway":{
+         "Type":"AWS::EC2::InternetGateway",
+         "Properties":{
+            "Tags":[
+               {
+                  "Key":"Name",
+                  "Value":{
+                     "Fn::Join":[
+                        "-",
+                        [
+                           {
+                              "Ref":"AWS::StackName"
+                           },
+                           "DMSInternetGateway"
+                        ]
+                     ]
+                  }
+               }
+            ]
+         }
+      },
+      "DMSAttachGateway":{
+         "Type":"AWS::EC2::VPCGatewayAttachment",
+         "Properties":{
+            "VpcId":{
+               "Ref":"DmsVpc"
+            },
+            "InternetGatewayId":{
+               "Ref":"DMSInternetGateway"
+            }
+         }
+      },
+      "DmsSubnet1":{
+         "Type":"AWS::EC2::Subnet",
+         "Properties":{
+            "VpcId":{
+               "Ref":"DmsVpc"
+            },
+            "MapPublicIpOnLaunch":"true",
+            "CidrBlock":"172.31.0.0/24",
+            "AvailabilityZone":{
+              "Fn::Select" : [ "0", { "Fn::GetAZs" : "" } ]
+            },
+            "Tags":[
+               {
+                  "Key":"Name",
+                  "Value":{
+                     "Fn::Join":[
+                        "-",
+                        [
+                           {
+                              "Ref":"AWS::StackName"
+                           },
+                           "DmsSubnet1"
+                        ]
+                     ]
+                  }
+               }
+            ]
+         }
+      },
+      "DmsSubnet2":{
+         "Type":"AWS::EC2::Subnet",
+         "Properties":{
+            "VpcId":{
+               "Ref":"DmsVpc"
+            },
+            "MapPublicIpOnLaunch":"true",
+            "CidrBlock":"172.31.8.0/24",
+            "AvailabilityZone":{
+              "Fn::Select" : [ "1", { "Fn::GetAZs" : "" } ]
+            },
+            "Tags":[
+               {
+                  "Key":"Name",
+                  "Value":{
+                     "Fn::Join":[
+                        "-",
+                        [
+                           {
+                              "Ref":"AWS::StackName"
+                           },
+                           "DmsSubnet2"
+                        ]
+                     ]
+                  }
+               }
+            ]
+         }
+      },
+      "DmsSubnet3":{
+         "Type":"AWS::EC2::Subnet",
+         "Properties":{
+            "VpcId":{
+               "Ref":"DmsVpc"
+            },
+            "MapPublicIpOnLaunch":"true",
+            "CidrBlock":"172.31.16.0/24",
+            "AvailabilityZone":{
+              "Fn::Select" : [ "2", { "Fn::GetAZs" : "" } ]
+            },
+            "Tags":[
+               {
+                  "Key":"Name",
+                  "Value":{
+                     "Fn::Join":[
+                        "-",
+                        [
+                           {
+                              "Ref":"AWS::StackName"
+                           },
+                           "DmsSubnet3"
+                        ]
+                     ]
+                  }
+               }
+            ]
+         }
+      },
+      "DmsDbSubnetGroup":{
+         "Type":"AWS::RDS::DBSubnetGroup",
+         "Properties":{
+            "DBSubnetGroupDescription":"DMS DB Subnet Group",
+            "SubnetIds":[
+               {
+                  "Ref":"DmsSubnet1"
+               },
+               {
+                  "Ref":"DmsSubnet2"
+               },
+               {
+                  "Ref":"DmsSubnet3"
+               }
+            ],
+            "Tags":[
+               {
+                  "Key":"Name",
+                  "Value":{
+                     "Fn::Join":[
+                        "-",
+                        [
+                           {
+                              "Ref":"AWS::StackName"
+                           },
+                           "DmsDbSubnetGroup"
+                        ]
+                     ]
+                  }
+               }
+            ]
+         }
+      },
+      "DmsPublicRouteTable":{
+         "Type":"AWS::EC2::RouteTable",
+         "Properties":{
+            "VpcId":{
+               "Ref":"DmsVpc"
+            },
+            "Tags":[
+               {
+                  "Key":"Name",
+                  "Value":{
+                     "Fn::Join":[
+                        "-",
+                        [
+                           {
+                              "Ref":"AWS::StackName"
+                           },
+                           "DmsPublicRouteTable"
+                        ]
+                     ]
+                  }
+               }
+            ]
+         }
+      },
+      "DmsPublicRoute":{
+         "Type":"AWS::EC2::Route",
+         "Properties":{
+            "RouteTableId":{
+               "Ref":"DmsPublicRouteTable"
+            },
+            "DestinationCidrBlock":"0.0.0.0/0",
+            "GatewayId":{
+               "Ref":"DMSInternetGateway"
+            }
+         }
+      },
+      "DmsSubnet1RouteTableAssociationA":{
+         "Type":"AWS::EC2::SubnetRouteTableAssociation",
+         "Properties":{
+            "SubnetId":{
+               "Ref":"DmsSubnet1"
+            },
+            "RouteTableId":{
+               "Ref":"DmsPublicRouteTable"
+            }
+         }
+      },
+      "DmsSubnet2RouteTableAssociationA":{
+         "Type":"AWS::EC2::SubnetRouteTableAssociation",
+         "Properties":{
+            "SubnetId":{
+               "Ref":"DmsSubnet2"
+            },
+            "RouteTableId":{
+               "Ref":"DmsPublicRouteTable"
+            }
+         }
+      },
+      "InstanceSecurityGroup":{
+         "Type":"AWS::EC2::SecurityGroup",
+         "Properties":{
+            "VpcId":{
+               "Ref":"DmsVpc"
+            },
+            "GroupDescription":"Enable RDP and SQL Server access",
+            "SecurityGroupIngress":[
+               {
+                  "IpProtocol":"tcp",
+                  "FromPort":"3389",
+                  "ToPort":"3389",
+                  "CidrIp":{ "Ref" : "IPAddress" }
+               },
+               {
+                  "IpProtocol":"tcp",
+                  "FromPort":"1433",
+                  "ToPort":"1433",
+                  "CidrIp":"172.31.0.0/16"
+               }
+            ]
+         }
+      },
+      "AuroraSecurityGroup":{
+         "Type":"AWS::EC2::SecurityGroup",
+         "Properties":{
+            "VpcId":{
+               "Ref":"DmsVpc"
+            },
+            "GroupDescription":"Enable Aurora access",
+            "SecurityGroupIngress":[
+               {
+                  "IpProtocol":"tcp",
+                  "FromPort":"3306",
+                  "ToPort":"3306",
+                  "CidrIp":"172.31.0.0/16"
+               }
+            ]
+         }
+      },
+      "QuickSightAccessSecurityGroup":{
+         "Type":"AWS::EC2::SecurityGroup",
+         "Properties":{
+            "VpcId":{
+               "Ref":"DmsVpc"
+            },
+            "GroupDescription":"Allow QuickSight access to Aurora DB",
+            "SecurityGroupIngress":[
+               {
+                  "IpProtocol":"tcp",
+                  "FromPort":"3306",
+                  "ToPort":"3306",
+                  "CidrIp":{ "Fn::FindInMap" : [ "QuickSightIPRange", { "Ref" : "AWS::Region" }, "range"]}
+               }
+            ]
+         }
+      },
+      "DMSRole": {
+        "Type": "AWS::IAM::Role",
+        "Properties": {
+          "RoleName": {
+               "Fn::Join":[
+                  "-",
+                  [
+                     {
+                        "Ref":"AWS::StackName"
+                     },
+                     "dms-s3-role"
+                  ]
+               ]
+            },
+          "AssumeRolePolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [{
+              "Effect": "Allow",
+              "Principal": {"Service": "dms.amazonaws.com"},
+              "Action": ["sts:AssumeRole"]
+              }]
+            },
+         "Policies": [{
+           "PolicyName": {
+                "Fn::Join":[
+                   "-",
+                   [
+                      {
+                         "Ref":"AWS::StackName"
+                      },
+                      "dms-s3-policy"
+                   ]
+                ]
+             },
+           "PolicyDocument": {
+             "Version": "2012-10-17",
+             "Statement": [
+               {
+               "Effect": "Allow",
+               "Action": [
+                 "s3:PutObject",
+                 "s3:DeleteObject"
+                ],
+               "Resource": [
+                 {"Fn::Join": ["", ["arn:aws:s3:::", { "Ref" : "TargetS3Bucket" },"/*"]]}
+               ]
+             },
+             {
+               "Effect": "Allow",
+               "Action": [
+                 "s3:ListBucket"
+              ],
+              "Resource":["*"]
+              }
+             ]
+           }
+          }
+        ]
+       }
+      },
+      "EC2SourceDB":{
+         "Type":"AWS::EC2::Instance",
+         "Properties":{
+            "SubnetId":{
+               "Ref":"DmsSubnet1"
+            },
+            "InstanceType":"m4.large",
+            "SecurityGroupIds":[
+               {
+                  "Ref":"InstanceSecurityGroup"
+               }
+            ],
+            "KeyName":{
+               "Ref":"KeyName"
+            },
+            "Tags":[
+               {
+                  "Key":"Name",
+                  "Value":{
+                     "Fn::Join":[
+                        "-",
+                        [
+                           {
+                              "Ref":"AWS::StackName"
+                           },
+                           "EC2SourceDB"
+                        ]
+                     ]
+                  }
+               }
+            ],
+            "BlockDeviceMappings":[
+               {
+                  "DeviceName":"/dev/sda1",
+                  "Ebs":{
+                     "DeleteOnTermination":"true",
+                     "Iops":"7500",
+                     "VolumeSize":"150",
+                     "VolumeType":"io1"
+                  }
+               }
+            ],
+            "ImageId": { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "32"]}
+         },
+         "DependsOn" : "DMSInternetGateway"
+      },
+      "AuroraDestinationDBCluster":{
+         "Type":"AWS::RDS::DBCluster",
+         "Properties":{
+            "DBSubnetGroupName":{
+               "Ref":"DmsDbSubnetGroup"
+            },
+            "VpcSecurityGroupIds":[
+               {
+                  "Fn::GetAtt":[
+                     "AuroraSecurityGroup",
+                     "GroupId"
+                  ]
+               },
+               {
+                  "Fn::GetAtt":[
+                     "QuickSightAccessSecurityGroup",
+                     "GroupId"
+                  ]
+               }
+            ],
+            "DatabaseName":"AuroraDestinationDB",
+            "Engine":"aurora",
+			"EngineMode":"serverless",	
+            "EngineVersion":"5.6.10a",			
+			"MasterUsername":"awssct",
+            "MasterUserPassword":"Password1"
+         },
+         "DependsOn":"AuroraSecurityGroup"
+      },
+     "TargetS3Bucket":{
+        "Type" : "AWS::S3::Bucket"
+      }
+   },
+   "Outputs":{
+      "SourceEC2EndpointDns":{
+         "Description":"Public DNSName of the newly created EC2 instance",
+         "Value":{
+            "Fn::GetAtt":[
+               "EC2SourceDB",
+               "PublicDnsName"
+            ]
+         }
+      },
+      "SourceEC2PrivateDns":{
+         "Description":"Private DNSName of the newly created EC2 instance",
+         "Value":{
+            "Fn::GetAtt":[
+               "EC2SourceDB",
+               "PrivateDnsName"
+            ]
+         }
+      },
+      "TargetAuroraEndpointDns":{
+         "Description":"Target Aurora Instance",
+         "Value":{
+            "Fn::GetAtt":[   
+               "AuroraDestinationDBCluster",         
+               "Endpoint.Address"
+            ]
+         }
+      },
+      "VpcId":{
+         "Description":"VPC Identifier",
+         "Value":{
+            "Ref":"DmsVpc"
+         }
+      },
+      "S3BucketName":{
+         "Description":"Target S3 Bucket",
+         "Value":{
+            "Ref":"TargetS3Bucket"
+          }
+       },
+	   "DMSRoleArn":{
+	     "Description":"S3 Role ARN",
+		 "Value": {
+		     "Fn::GetAtt":[
+               "DMSRole",
+               "Arn"
+            ]
+		}
+    } 		
+   }
+}

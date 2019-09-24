@@ -1,0 +1,83 @@
+
+1) First table creation - sporting_event_ticket
+
+
+CREATE EXTERNAL TABLE IF NOT EXISTS baseball.sporting_event_ticket (
+  `id` bigint,
+  `sporting_event_id` bigint,
+  `sport_location_id` bigint,
+  `seat_level` bigint,
+  `seat_section` bigint,
+  `seat_row` string,
+  `seat` bigint,
+  `ticketholder_id` string,
+  `ticket_price` double
+)
+STORED AS PARQUET
+LOCATION 's3://<your S3 bucket location>/parquet/sporting_event_ticket/'
+TBLPROPERTIES ("parquet.compress"="SNAPPY");
+
+
+2) Second table creation - sport_location
+
+
+CREATE EXTERNAL TABLE IF NOT EXISTS baseball.sport_location (
+  `id` bigint,
+  `name` string,
+  `city` string,
+  `seating_capacity` bigint,
+  `levels` bigint,
+  `sections` bigint
+)
+STORED AS PARQUET
+LOCATION 's3://<your S3 bucket location>/parquet/sport_location/'
+TBLPROPERTIES ("parquet.compress"="SNAPPY");
+
+
+
+3) Third table creation - sport_team
+
+CREATE EXTERNAL TABLE IF NOT EXISTS baseball.sport_team (
+  `id` int,
+  `name` string,
+  `abbreviated_name` string,
+  `home_field_id` int,
+  `sport_type_name` string,
+  `sport_league_short_name` string,
+  `sport_division_short_name` string
+)
+STORED AS PARQUET
+LOCATION 's3://<your S3 bucket location>/parquet/sport_team/'
+TBLPROPERTIES ("parquet.compress"="SNAPPY");
+
+
+4) Fourth table creation - sporting_event
+
+CREATE EXTERNAL TABLE IF NOT EXISTS baseball.sporting_event (
+  `id` bigint,
+  `sport_type_name` string,
+  `home_team_id` int,
+  `away_team_id` int,
+  `location_id` int,
+  `start_date_time` string,
+  `sold_out` int,
+  `start_date` string
+)
+STORED AS PARQUET
+LOCATION 's3://<your S3 bucket location>/parquet/sporting_event/'
+TBLPROPERTIES ("parquet.compress"="SNAPPY");
+
+
+QUERIES:
+
+Query 1 : Show all team names and home stadiums
+select sport_team.id as "ID", sport_team.name as "Team Name", sport_location.name as "Stadium Name", sport_location.city as "Stadium City" from sport_team,sport_location where sport_team.home_field_id=sport_location.id;
+
+Query 2 : Total number of games played in PNC Park in Pittsburgh (location ID 21)
+select count(*) as "Total games in PNC Park" from sporting_event where location_id=21;
+
+Query 3 : Total number of level 2 seats (along with revenue) that were sold at AT&T Park in SFO for the entire season
+select count(*) as "Total L2 seats in AT&T Park", sum(ticket_price) as "Total Revenue in Dollars" from sporting_event_ticket where sport_location_id=2 and seat_level=2;
+
+Query 4 : Revenue from each game in dollars
+select sporting_event_id, sum(ticket_Price) as revenue from sporting_event_ticket group by sporting_event_id order by sum(ticket_price) desc;
